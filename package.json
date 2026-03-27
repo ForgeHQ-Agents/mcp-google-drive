@@ -1,0 +1,29 @@
+{
+  "name": "@forgehq/google-drive-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for Google Drive, Docs, and Sheets — read, comment, and manage files via service account",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "google-drive-mcp": "./dist/index.js"
+  },
+  "scripts": {
+    "start": "node dist/index.js",
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "clean": "rm -rf dist"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.6.1",
+    "googleapis": "^144.0.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}
