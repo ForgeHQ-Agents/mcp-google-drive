@@ -1,11 +1,11 @@
 {
-  "name": "@forgehq/google-drive-mcp",
+  "name": "mcp-google-drive",
   "version": "1.0.0",
   "description": "MCP server for Google Drive, Docs, and Sheets — read, comment, and manage files via service account",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "google-drive-mcp": "./dist/index.js"
+    "mcp-google-drive": "./dist/index.js"
   },
   "scripts": {
     "start": "node dist/index.js",
