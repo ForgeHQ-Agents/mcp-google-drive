@@ -141,3 +141,60 @@ export const GetSheetDataSchema = z.object({
   response_format: responseFormatSchema,
 }).strict();
 export type GetSheetDataInput = z.infer<typeof GetSheetDataSchema>;
+
+export const WriteSheetRangeSchema = z.object({
+  spreadsheet_id: z.string().min(1).describe("The spreadsheet ID"),
+  range: z.string().min(1).describe("A1 notation range to write to (e.g., 'Sheet1!A1:C3')"),
+  values: z.array(z.array(z.union([z.string(), z.number(), z.boolean(), z.null()]))).min(1)
+    .describe("2D array of values to write. Rows × columns."),
+  value_input_option: z.enum(["RAW", "USER_ENTERED"]).default("USER_ENTERED")
+    .describe("RAW stores as-is; USER_ENTERED parses formulas and dates (default)"),
+  response_format: responseFormatSchema,
+}).strict();
+export type WriteSheetRangeInput = z.infer<typeof WriteSheetRangeSchema>;
+
+export const AppendSheetRowsSchema = z.object({
+  spreadsheet_id: z.string().min(1).describe("The spreadsheet ID"),
+  range: z.string().min(1).describe("A1 notation of the table to append to (e.g., 'Sheet1!A1'). Rows are appended after the last row with data."),
+  values: z.array(z.array(z.union([z.string(), z.number(), z.boolean(), z.null()]))).min(1)
+    .describe("2D array of rows to append"),
+  value_input_option: z.enum(["RAW", "USER_ENTERED"]).default("USER_ENTERED")
+    .describe("RAW stores as-is; USER_ENTERED parses formulas and dates (default)"),
+  response_format: responseFormatSchema,
+}).strict();
+export type AppendSheetRowsInput = z.infer<typeof AppendSheetRowsSchema>;
+
+export const ClearSheetRangeSchema = z.object({
+  spreadsheet_id: z.string().min(1).describe("The spreadsheet ID"),
+  range: z.string().min(1).describe("A1 notation range to clear (e.g., 'Sheet1!A2:D100')"),
+  response_format: responseFormatSchema,
+}).strict();
+export type ClearSheetRangeInput = z.infer<typeof ClearSheetRangeSchema>;
+
+// ============================================================
+// GOOGLE DOCS WRITE SCHEMAS
+// ============================================================
+
+export const DocsAppendTextSchema = z.object({
+  document_id: z.string().min(1).describe("The Google Doc ID"),
+  text: z.string().min(1).describe("Text to append at the end of the document"),
+  response_format: responseFormatSchema,
+}).strict();
+export type DocsAppendTextInput = z.infer<typeof DocsAppendTextSchema>;
+
+export const DocsReplaceTextSchema = z.object({
+  document_id: z.string().min(1).describe("The Google Doc ID"),
+  find: z.string().min(1).describe("Text to find (plain text, not regex)"),
+  replace_with: z.string().describe("Text to replace it with"),
+  match_case: z.boolean().default(true).describe("Case-sensitive match (default: true)"),
+  response_format: responseFormatSchema,
+}).strict();
+export type DocsReplaceTextInput = z.infer<typeof DocsReplaceTextSchema>;
+
+export const DocsInsertTextSchema = z.object({
+  document_id: z.string().min(1).describe("The Google Doc ID"),
+  text: z.string().min(1).describe("Text to insert"),
+  index: z.number().int().min(1).describe("Character index at which to insert (1-based). Use google_docs_read with response_format=json to find indices."),
+  response_format: responseFormatSchema,
+}).strict();
+export type DocsInsertTextInput = z.infer<typeof DocsInsertTextSchema>;

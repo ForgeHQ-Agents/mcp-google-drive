@@ -16,10 +16,16 @@ import {
   ReplyToCommentSchema, type ReplyToCommentInput,
   ResolveCommentSchema, type ResolveCommentInput,
   ReadGoogleDocSchema, type ReadGoogleDocInput,
+  DocsAppendTextSchema, type DocsAppendTextInput,
+  DocsReplaceTextSchema, type DocsReplaceTextInput,
+  DocsInsertTextSchema, type DocsInsertTextInput,
   GetSpreadsheetSchema, type GetSpreadsheetInput,
   ReadSheetRangeSchema, type ReadSheetRangeInput,
   SearchSheetSchema, type SearchSheetInput,
   GetSheetDataSchema, type GetSheetDataInput,
+  WriteSheetRangeSchema, type WriteSheetRangeInput,
+  AppendSheetRowsSchema, type AppendSheetRowsInput,
+  ClearSheetRangeSchema, type ClearSheetRangeInput,
 } from "./schemas.js";
 
 async function main() {
@@ -42,7 +48,7 @@ Environment:
 
   const server = new McpServer({
     name: "google-drive-mcp",
-    version: "1.0.0",
+    version: "1.1.0",
   });
 
   // ============================================================
@@ -325,6 +331,70 @@ Environment:
     }
   );
 
+  server.registerTool(
+    "google_docs_append_text",
+    {
+      title: "Append Text to Google Doc",
+      description: `Append text at the end of a Google Doc.`,
+      inputSchema: DocsAppendTextSchema,
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+    },
+    async (params: DocsAppendTextInput) => {
+      try {
+        const result = await client.docsAppendText(params.document_id, params.text);
+        const text = `Text appended to document \`${result.documentId}\`.`;
+        if (params.response_format === "json") {
+          return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        }
+        return { content: [{ type: "text", text }] };
+      } catch (error) {
+        return { content: [{ type: "text", text: client.handleApiError(error) }], isError: true };
+      }
+    }
+  );
+
+  server.registerTool(
+    "google_docs_replace_text",
+    {
+      title: "Find & Replace Text in Google Doc",
+      description: `Find all occurrences of a string in a Google Doc and replace them.`,
+      inputSchema: DocsReplaceTextSchema,
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+    },
+    async (params: DocsReplaceTextInput) => {
+      try {
+        const result = await client.docsReplaceText(params.document_id, params.find, params.replace_with, params.match_case);
+        if (params.response_format === "json") {
+          return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        }
+        return { content: [{ type: "text", text: `Replaced ${result.occurrencesChanged} occurrence(s) of "${params.find}" in document \`${result.documentId}\`.` }] };
+      } catch (error) {
+        return { content: [{ type: "text", text: client.handleApiError(error) }], isError: true };
+      }
+    }
+  );
+
+  server.registerTool(
+    "google_docs_insert_text",
+    {
+      title: "Insert Text at Index in Google Doc",
+      description: `Insert text at a specific character index in a Google Doc. Use google_docs_read with response_format=json to find the target index.`,
+      inputSchema: DocsInsertTextSchema,
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+    },
+    async (params: DocsInsertTextInput) => {
+      try {
+        const result = await client.docsInsertText(params.document_id, params.text, params.index);
+        if (params.response_format === "json") {
+          return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        }
+        return { content: [{ type: "text", text: `Text inserted at index ${params.index} in document \`${result.documentId}\`.` }] };
+      } catch (error) {
+        return { content: [{ type: "text", text: client.handleApiError(error) }], isError: true };
+      }
+    }
+  );
+
   // ============================================================
   // GOOGLE SHEETS TOOLS
   // ============================================================
@@ -452,6 +522,69 @@ Environment:
         return {
           content: [{ type: "text", text: `# ${params.sheet_name}\n\n${headerLine}\n${sepLine}\n${dataLines.join("\n")}` }],
         };
+      } catch (error) {
+        return { content: [{ type: "text", text: client.handleApiError(error) }], isError: true };
+      }
+    }
+  );
+
+  server.registerTool(
+    "google_sheets_write_range",
+    {
+      title: "Write to Sheet Range",
+      description: `Write values to a range in a Google Sheets spreadsheet. Overwrites existing content in the range.`,
+      inputSchema: WriteSheetRangeSchema,
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+    },
+    async (params: WriteSheetRangeInput) => {
+      try {
+        const result = await client.writeSheetRange(params.spreadsheet_id, params.range, params.values, params.value_input_option);
+        if (params.response_format === "json") {
+          return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        }
+        return { content: [{ type: "text", text: `Written to \`${result.updatedRange}\`: ${result.updatedRows} row(s), ${result.updatedColumns} column(s), ${result.updatedCells} cell(s) updated.` }] };
+      } catch (error) {
+        return { content: [{ type: "text", text: client.handleApiError(error) }], isError: true };
+      }
+    }
+  );
+
+  server.registerTool(
+    "google_sheets_append_rows",
+    {
+      title: "Append Rows to Sheet",
+      description: `Append one or more rows after the last row with data in a Google Sheets spreadsheet.`,
+      inputSchema: AppendSheetRowsSchema,
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+    },
+    async (params: AppendSheetRowsInput) => {
+      try {
+        const result = await client.appendSheetRows(params.spreadsheet_id, params.range, params.values, params.value_input_option);
+        if (params.response_format === "json") {
+          return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        }
+        return { content: [{ type: "text", text: `Appended ${result.updatedRows} row(s) (${result.updatedCells} cells) to \`${result.updatedRange}\`.` }] };
+      } catch (error) {
+        return { content: [{ type: "text", text: client.handleApiError(error) }], isError: true };
+      }
+    }
+  );
+
+  server.registerTool(
+    "google_sheets_clear_range",
+    {
+      title: "Clear Sheet Range",
+      description: `Clear all values in a range of a Google Sheets spreadsheet. Preserves cell formatting.`,
+      inputSchema: ClearSheetRangeSchema,
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
+    },
+    async (params: ClearSheetRangeInput) => {
+      try {
+        const result = await client.clearSheetRange(params.spreadsheet_id, params.range);
+        if (params.response_format === "json") {
+          return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        }
+        return { content: [{ type: "text", text: `Cleared range \`${result.clearedRange}\`.` }] };
       } catch (error) {
         return { content: [{ type: "text", text: client.handleApiError(error) }], isError: true };
       }

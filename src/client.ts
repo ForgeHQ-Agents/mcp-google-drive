@@ -389,7 +389,7 @@ export async function resolveComment(
 }
 
 // ============================================================
-// GOOGLE DOCS FUNCTIONS (read-only)
+// GOOGLE DOCS FUNCTIONS
 // ============================================================
 
 /**
@@ -529,7 +529,7 @@ function convertDocToMarkdown(doc: docs_v1.Schema$Document): string {
 }
 
 // ============================================================
-// GOOGLE SHEETS FUNCTIONS (read-only)
+// GOOGLE SHEETS FUNCTIONS
 // ============================================================
 
 /**
@@ -616,4 +616,164 @@ export async function getSheetData(
   });
 
   return { headers, rows };
+}
+
+/**
+ * Write values to a specific range in a spreadsheet.
+ */
+export async function writeSheetRange(
+  spreadsheetId: string,
+  range: string,
+  values: (string | number | boolean | null)[][],
+  valueInputOption: "RAW" | "USER_ENTERED" = "USER_ENTERED"
+): Promise<{ updatedRange: string; updatedRows: number; updatedColumns: number; updatedCells: number }> {
+  const sheets = await getSheetsClient();
+  const response = await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range,
+    valueInputOption,
+    requestBody: { values },
+  });
+  return {
+    updatedRange: response.data.updatedRange || range,
+    updatedRows: response.data.updatedRows || 0,
+    updatedColumns: response.data.updatedColumns || 0,
+    updatedCells: response.data.updatedCells || 0,
+  };
+}
+
+/**
+ * Append rows after the last row with data in the given range.
+ */
+export async function appendSheetRows(
+  spreadsheetId: string,
+  range: string,
+  values: (string | number | boolean | null)[][],
+  valueInputOption: "RAW" | "USER_ENTERED" = "USER_ENTERED"
+): Promise<{ updatedRange: string; updatedRows: number; updatedCells: number }> {
+  const sheets = await getSheetsClient();
+  const response = await sheets.spreadsheets.values.append({
+    spreadsheetId,
+    range,
+    valueInputOption,
+    insertDataOption: "INSERT_ROWS",
+    requestBody: { values },
+  });
+  const updates = response.data.updates;
+  return {
+    updatedRange: updates?.updatedRange || range,
+    updatedRows: updates?.updatedRows || 0,
+    updatedCells: updates?.updatedCells || 0,
+  };
+}
+
+/**
+ * Clear all values in a range (keeps formatting).
+ */
+export async function clearSheetRange(
+  spreadsheetId: string,
+  range: string
+): Promise<{ clearedRange: string }> {
+  const sheets = await getSheetsClient();
+  const response = await sheets.spreadsheets.values.clear({
+    spreadsheetId,
+    range,
+  });
+  return { clearedRange: response.data.clearedRange || range };
+}
+
+// ============================================================
+// GOOGLE DOCS WRITE FUNCTIONS
+// ============================================================
+
+/**
+ * Append text at the end of a Google Doc.
+ */
+export async function docsAppendText(
+  documentId: string,
+  text: string
+): Promise<{ documentId: string; revisionsId: string }> {
+  const docs = await getDocsClient();
+
+  // Get the end index of the document body
+  const doc = await docs.documents.get({ documentId });
+  const content = doc.data.body?.content || [];
+  const lastElement = content[content.length - 1];
+  // End index is exclusive; subtract 1 to insert before the final newline
+  const endIndex = (lastElement?.endIndex || 2) - 1;
+
+  const response = await docs.documents.batchUpdate({
+    documentId,
+    requestBody: {
+      requests: [
+        {
+          insertText: {
+            location: { index: endIndex },
+            text,
+          },
+        },
+      ],
+    },
+  });
+
+  return {
+    documentId,
+    revisionsId: response.data.documentId || documentId,
+  };
+}
+
+/**
+ * Find and replace text throughout a Google Doc.
+ */
+export async function docsReplaceText(
+  documentId: string,
+  find: string,
+  replaceWith: string,
+  matchCase: boolean = true
+): Promise<{ documentId: string; occurrencesChanged: number }> {
+  const docs = await getDocsClient();
+
+  const response = await docs.documents.batchUpdate({
+    documentId,
+    requestBody: {
+      requests: [
+        {
+          replaceAllText: {
+            containsText: { text: find, matchCase },
+            replaceText: replaceWith,
+          },
+        },
+      ],
+    },
+  });
+
+  const occurrences = response.data.replies?.[0]?.replaceAllText?.occurrencesChanged || 0;
+  return { documentId, occurrencesChanged: occurrences };
+}
+
+/**
+ * Insert text at a specific index in a Google Doc.
+ */
+export async function docsInsertText(
+  documentId: string,
+  text: string,
+  index: number
+): Promise<{ documentId: string }> {
+  const docs = await getDocsClient();
+
+  await docs.documents.batchUpdate({
+    documentId,
+    requestBody: {
+      requests: [
+        {
+          insertText: {
+            location: { index },
+            text,
+          },
+        },
+      ],
+    },
+  });
+
+  return { documentId };
 }
