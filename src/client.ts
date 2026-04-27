@@ -233,6 +233,11 @@ export async function readDriveFile(
   const CANONICAL_EXTENSIONS: Record<string, string> = {
     "application/pdf": ".pdf",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/gif": ".gif",
+    "image/webp": ".webp",
+    "image/svg+xml": ".svg",
   };
 
   if (!isTextFile) {
