@@ -48,7 +48,7 @@ Environment:
 
   const server = new McpServer({
     name: "google-drive-mcp",
-    version: "1.1.0",
+    version: "1.2.0",
   });
 
   // ============================================================
@@ -130,7 +130,7 @@ Environment:
     "google_drive_read_file",
     {
       title: "Read Drive File Content",
-      description: `Read or export the content of a file. Exports Google Workspace files to chosen format. Downloads text files directly. Binary files cannot be read.`,
+      description: `Read or export the content of a file. Exports Google Workspace files (Docs, Sheets, Slides) to text/html/csv. Downloads text files directly. Downloads PDF and DOCX to workspace/ for text extraction.`,
       inputSchema: ReadDriveFileSchema,
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     },

@@ -1,4 +1,6 @@
 import { google, drive_v3, docs_v1, sheets_v4 } from "googleapis";
+import { writeFileSync, mkdirSync } from "fs";
+import { join } from "path";
 import { getAuthenticatedClient } from "./auth.js";
 import type { DriveFileInfo, DriveComment, DriveReply, SpreadsheetInfo } from "./types.js";
 
@@ -228,7 +230,34 @@ export async function readDriveFile(
   ];
   const isTextFile = textMimeTypes.some((t) => fileMimeType.startsWith(t) || fileMimeType.includes(t));
 
+  const CANONICAL_EXTENSIONS: Record<string, string> = {
+    "application/pdf": ".pdf",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
+  };
+
   if (!isTextFile) {
+    const workingDir = process.env.AGENT_WORKING_DIR;
+    if (workingDir && fileMimeType in CANONICAL_EXTENSIONS) {
+      // Download binary to workspace/ so the agent can extract text from it
+      const response = await drive.files.get(
+        { fileId, alt: "media", supportsAllDrives: true },
+        { responseType: "arraybuffer" }
+      );
+      const workspaceDir = join(workingDir, "workspace");
+      mkdirSync(workspaceDir, { recursive: true });
+      // Ensure canonical extension so extract-text detects type correctly
+      const ext = CANONICAL_EXTENSIONS[fileMimeType];
+      const baseName = fileName.endsWith(ext) ? fileName : `${fileName}${ext}`;
+      const safeName = `${fileId}_${baseName.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+      const outputPath = join(workspaceDir, safeName);
+      writeFileSync(outputPath, Buffer.from(response.data as ArrayBuffer));
+      return {
+        content: `Downloaded to workspace/${safeName} — use extract-text to read its content`,
+        mimeType: fileMimeType,
+        fileName,
+      };
+    }
+
     const sizeKB = file.data.size ? Math.round(Number(file.data.size) / 1024) : 0;
     return {
       content: `(Binary file: ${fileMimeType}, ${sizeKB}KB — cannot be displayed as text. Use webViewLink to open in browser.)`,
