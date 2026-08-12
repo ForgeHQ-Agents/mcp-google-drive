@@ -19,6 +19,7 @@ import {
   DocsAppendTextSchema, type DocsAppendTextInput,
   DocsReplaceTextSchema, type DocsReplaceTextInput,
   DocsInsertTextSchema, type DocsInsertTextInput,
+  DocsInsertTableSchema, type DocsInsertTableInput,
   GetSpreadsheetSchema, type GetSpreadsheetInput,
   ReadSheetRangeSchema, type ReadSheetRangeInput,
   SearchSheetSchema, type SearchSheetInput,
@@ -48,7 +49,7 @@ Environment:
 
   const server = new McpServer({
     name: "google-drive-mcp",
-    version: "1.2.1",
+    version: "1.3.0",
   });
 
   // ============================================================
@@ -389,6 +390,27 @@ Environment:
           return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
         }
         return { content: [{ type: "text", text: `Text inserted at index ${params.index} in document \`${result.documentId}\`.` }] };
+      } catch (error) {
+        return { content: [{ type: "text", text: client.handleApiError(error) }], isError: true };
+      }
+    }
+  );
+
+  server.registerTool(
+    "google_docs_insert_table",
+    {
+      title: "Insert Table into Google Doc",
+      description: `Insert a real, native table into a Google Doc and fill its cells. Use this whenever the content belongs in a table — writing rows as pipe-separated or tab-separated text does NOT produce a table in Docs. Appends at the end of the document unless an index is given.`,
+      inputSchema: DocsInsertTableSchema,
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+    },
+    async (params: DocsInsertTableInput) => {
+      try {
+        const result = await client.docsInsertTable(params.document_id, params.rows, params.index, params.bold_header);
+        if (params.response_format === "json") {
+          return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        }
+        return { content: [{ type: "text", text: `Inserted a ${result.rows}×${result.columns} table (${result.cellsFilled} cell(s) filled) into document \`${result.documentId}\`.` }] };
       } catch (error) {
         return { content: [{ type: "text", text: client.handleApiError(error) }], isError: true };
       }

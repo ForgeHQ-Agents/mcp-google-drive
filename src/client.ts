@@ -785,6 +785,121 @@ export async function docsReplaceText(
   return { documentId, occurrencesChanged: occurrences };
 }
 
+/** batchUpdate does not return the table it inserted, so find it by position. */
+function findTableAt(
+  content: docs_v1.Schema$StructuralElement[],
+  index: number
+): docs_v1.Schema$Table | null {
+  let best: docs_v1.Schema$Table | null = null;
+  let bestStart = Infinity;
+  for (const element of content) {
+    const start = element.startIndex;
+    if (!element.table || start == null) continue;
+    if (start >= index && start < bestStart) {
+      best = element.table;
+      bestStart = start;
+    }
+  }
+  return best;
+}
+
+async function boldTableHeaderRow(
+  docs: docs_v1.Docs,
+  documentId: string,
+  tableIndex: number
+): Promise<void> {
+  const doc = await docs.documents.get({ documentId });
+  const table = findTableAt(doc.data.body?.content || [], tableIndex);
+  const headerCells = table?.tableRows?.[0]?.tableCells || [];
+
+  const requests: docs_v1.Schema$Request[] = [];
+  for (const cell of headerCells) {
+    for (const element of cell.content || []) {
+      const start = element.startIndex;
+      const end = element.endIndex;
+      // endIndex covers the paragraph's trailing newline, which cannot be styled
+      if (start == null || end == null || end - 1 <= start) continue;
+      requests.push({
+        updateTextStyle: {
+          range: { startIndex: start, endIndex: end - 1 },
+          textStyle: { bold: true },
+          fields: "bold",
+        },
+      });
+    }
+  }
+
+  if (requests.length > 0) {
+    await docs.documents.batchUpdate({ documentId, requestBody: { requests } });
+  }
+}
+
+/**
+ * Insert a native table into a Google Doc and fill its cells.
+ */
+export async function docsInsertTable(
+  documentId: string,
+  rows: string[][],
+  index?: number,
+  boldHeader: boolean = true
+): Promise<{ documentId: string; rows: number; columns: number; cellsFilled: number }> {
+  const docs = await getDocsClient();
+
+  const columns = Math.max(...rows.map((row) => row.length));
+  const grid = rows.map((row) => {
+    const padded = row.slice(0, columns).map((cell) => cell ?? "");
+    while (padded.length < columns) padded.push("");
+    return padded;
+  });
+
+  let insertIndex = index;
+  if (insertIndex == null) {
+    const doc = await docs.documents.get({ documentId });
+    const content = doc.data.body?.content || [];
+    const lastElement = content[content.length - 1];
+    insertIndex = (lastElement?.endIndex || 2) - 1;
+  }
+
+  await docs.documents.batchUpdate({
+    documentId,
+    requestBody: {
+      requests: [
+        { insertTable: { rows: grid.length, columns, location: { index: insertIndex } } },
+      ],
+    },
+  });
+
+  // Each insert shifts every index after it, so fill from the last cell backwards.
+  const withTable = await docs.documents.get({ documentId });
+  const table = findTableAt(withTable.data.body?.content || [], insertIndex);
+  if (!table) {
+    throw new Error("Table was inserted but could not be located to fill its cells");
+  }
+
+  const tableRows = table.tableRows || [];
+  const requests: docs_v1.Schema$Request[] = [];
+  for (let r = tableRows.length - 1; r >= 0; r--) {
+    const cells = tableRows[r].tableCells || [];
+    for (let c = cells.length - 1; c >= 0; c--) {
+      const text = grid[r]?.[c];
+      if (!text) continue;
+      const start = cells[c].content?.[0]?.startIndex;
+      if (start == null) continue;
+      requests.push({ insertText: { location: { index: start }, text } });
+    }
+  }
+
+  if (requests.length > 0) {
+    await docs.documents.batchUpdate({ documentId, requestBody: { requests } });
+  }
+
+  if (boldHeader) {
+    await boldTableHeaderRow(docs, documentId, insertIndex);
+  }
+
+  return { documentId, rows: grid.length, columns, cellsFilled: requests.length };
+}
+
 /**
  * Insert text at a specific index in a Google Doc.
  */

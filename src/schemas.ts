@@ -191,6 +191,17 @@ export const DocsReplaceTextSchema = z.object({
 }).strict();
 export type DocsReplaceTextInput = z.infer<typeof DocsReplaceTextSchema>;
 
+export const DocsInsertTableSchema = z.object({
+  document_id: z.string().min(1).describe("The Google Doc ID"),
+  rows: z.array(z.array(z.string())).min(1).max(500)
+    .describe("2D array of cell text, rows × columns. The first row is treated as the header. Short rows are padded with empty cells."),
+  index: z.number().int().min(1).optional()
+    .describe("Character index to insert the table at. Omit to append at the end of the document."),
+  bold_header: z.boolean().default(true).describe("Bold the first row (default: true)"),
+  response_format: responseFormatSchema,
+}).strict();
+export type DocsInsertTableInput = z.infer<typeof DocsInsertTableSchema>;
+
 export const DocsInsertTextSchema = z.object({
   document_id: z.string().min(1).describe("The Google Doc ID"),
   text: z.string().min(1).describe("Text to insert"),
